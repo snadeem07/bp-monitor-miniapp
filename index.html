@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>BP Monitor</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 100%;
+            padding: 16px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #999);
+        }
+        
+        .upload-section {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .upload-btn {
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            max-width: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px auto;
+        }
+        
+        .upload-btn:active {
+            opacity: 0.8;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-bottom: 6px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--tg-theme-text-color, #000);
+        }
+        
+        .stat-unit {
+            font-size: 11px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-top: 4px;
+        }
+        
+        .chart-container {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--tg-theme-text-color, #000);
+        }
+        
+        .reading-list {
+            margin-top: 20px;
+        }
+        
+        .reading-item {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .reading-info {
+            flex: 1;
+        }
+        
+        .reading-time {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-bottom: 4px;
+        }
+        
+        .reading-values {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .reading-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-normal {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-elevated {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--tg-theme-hint-color, #999);
+        }
+        
+        .spinner {
+            border: 3px solid var(--tg-theme-hint-color, #f3f3f3);
+            border-top: 3px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--tg-theme-hint-color, #999);
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--tg-theme-hint-color, #999);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .tab.active {
+            color: var(--tg-theme-button-color, #0088cc);
+            border-bottom-color: var(--tg-theme-button-color, #0088cc);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🩺 BP Monitor</h1>
+            <p>Track your blood pressure</p>
+        </div>
+        
+        <div class="upload-section">
+            <div style="font-size: 48px; margin-bottom: 12px;">📸</div>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                <span>📷</span> Take/Upload Photo
+            </button>
+            <input type="file" id="fileInput" accept="image/*" capture="environment">
+            <p style="font-size: 12px; color: var(--tg-theme-hint-color, #999); margin-top: 12px;">
+                Take a photo of your BP monitor
+            </p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('overview')">Overview</button>
+            <button class="tab" onclick="switchTab('charts')">Charts</button>
+            <button class="tab" onclick="switchTab('history')">History</button>
+        </div>
+        
+        <div id="overview-tab" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Avg Systolic</div>
+                    <div class="stat-value" id="avgSys">--</div>
+                    <div class="stat-unit">mmHg</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Diastolic</div>
+                    <div class="stat-value" id="avgDia">--</div>
+                    <div class="stat-unit">mmHg</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Pulse</div>
+                    <div class="stat-value" id="avgPulse">--</div>
+                    <div class="stat-unit">bpm</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Readings</div>
+                    <div class="stat-value" id="totalReadings">0</div>
+                    <div class="stat-unit">measurements</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="charts-tab" class="tab-content">
+            <div class="chart-container">
+                <div class="chart-title">Blood Pressure Trend</div>
+                <canvas id="bpChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Pulse Rate Trend</div>
+                <canvas id="pulseChart"></canvas>
+            </div>
+        </div>
+        
+        <div id="history-tab" class="tab-content">
+            <div class="reading-list" id="readingList"></div>
+        </div>
+    </div>
+    
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+        
+        // Set theme colors
+        document.body.style.background = tg.themeParams.bg_color || '#ffffff';
+        
+        let bpChart = null;
+        let pulseChart = null;
+        let readings = [];
+        
+        const API_URL = 'http://localhost:5000'; // Change this to your backend URL when deployed
+        
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            if (tabName === 'charts' && readings.length > 0) {
+                setTimeout(() => updateCharts(), 100);
+            }
+        }
+        
+        function getBloodPressureCategory(sys, dia) {
+            if (sys < 120 && dia < 80) return { category: 'Normal', class: 'status-normal' };
+            if (sys >= 120 && sys < 130 && dia < 80) return { category: 'Elevated', class: 'status-elevated' };
+            if ((sys >= 130 && sys < 140) || (dia >= 80 && dia < 90)) return { category: 'Stage 1', class: 'status-high' };
+            if (sys >= 140 || dia >= 90) return { category: 'Stage 2', class: 'status-high' };
+            return { category: 'Unknown', class: 'status-normal' };
+        }
+        
+        async function loadReadings() {
+            try {
+                const response = await fetch(`${API_URL}/readings`);
+                readings = await response.json();
+                updateUI();
+            } catch (error) {
+                console.error('Error loading readings:', error);
+                showEmptyState();
+            }
+        }
+        
+        function updateUI() {
+            if (readings.length === 0) {
+                showEmptyState();
+                return;
+            }
+            
+            // Calculate averages
+            const avgSys = Math.round(readings.reduce((sum, r) => sum + r.sys, 0) / readings.length);
+            const avgDia = Math.round(readings.reduce((sum, r) => sum + r.dia, 0) / readings.length);
+            const avgPulse = Math.round(readings.reduce((sum, r) => sum + r.pulse, 0) / readings.length);
+            
+            document.getElementById('avgSys').textContent = avgSys;
+            document.getElementById('avgDia').textContent = avgDia;
+            document.getElementById('avgPulse').textContent = avgPulse;
+            document.getElementById('totalReadings').textContent = readings.length;
+            
+            updateReadingList();
+            updateCharts();
+        }
+        
+        function updateReadingList() {
+            const listContainer = document.getElementById('readingList');
+            listContainer.innerHTML = '';
+            
+            readings.slice().reverse().forEach(reading => {
+                const status = getBloodPressureCategory(reading.sys, reading.dia);
+                const date = new Date(reading.date + 'T' + reading.time);
+                
+                const item = document.createElement('div');
+                item.className = 'reading-item';
+                item.innerHTML = `
+                    <div class="reading-info">
+                        <div class="reading-time">${date.toLocaleString()}</div>
+                        <div class="reading-values">${reading.sys}/${reading.dia} • ${reading.pulse} bpm</div>
+                    </div>
+                    <div class="reading-status ${status.class}">${status.category}</div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+        
+        function updateCharts() {
+            if (readings.length === 0) return;
+            
+            const labels = readings.map(r => {
+                const date = new Date(r.date + 'T' + r.time);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            });
+            
+            // BP Chart
+            const bpCtx = document.getElementById('bpChart').getContext('2d');
+            if (bpChart) bpChart.destroy();
+            
+            bpChart = new Chart(bpCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Systolic',
+                            data: readings.map(r => r.sys),
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Diastolic',
+                            data: readings.map(r => r.dia),
+                            borderColor: '#0088cc',
+                            backgroundColor: 'rgba(0, 136, 204, 0.1)',
+                            tension: 0.4,
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+            
+            // Pulse Chart
+            const pulseCtx = document.getElementById('pulseChart').getContext('2d');
+            if (pulseChart) pulseChart.destroy();
+            
+            pulseChart = new Chart(pulseCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Pulse',
+                        data: readings.map(r => r.pulse),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+        }
+        
+        function showEmptyState() {
+            document.getElementById('readingList').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <p>No readings yet</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Upload a photo to get started</p>
+                </div>
+            `;
+        }
+        
+        document.getElementById('fileInput').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            tg.MainButton.setText('Processing...').show();
+            
+            const formData = new FormData();
+            formData.append('photo', file);
+            
+            try {
+                const response = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    tg.showAlert(`Reading saved!\nSYS: ${result.sys}, DIA: ${result.dia}, Pulse: ${result.pulse}`);
+                    await loadReadings();
+                } else {
+                    tg.showAlert('Failed to process image. Please try again.');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                tg.showAlert('Error uploading photo. Please try again.');
+            } finally {
+                tg.MainButton.hide();
+                event.target.value = '';
+            }
+        });
+        
+        // Load initial data
+        loadReadings();
+    </script>
+</body>
+</html>
